@@ -34,7 +34,23 @@ import settings
 from database import Channel, Contest, Entry, User, Winner, session_scope
 from referrals import get_user_by_telegram, referral_link
 
-MINI_APP_HTML = (Path(__file__).with_name("mini_app.html")).read_text(encoding="utf-8")
+def _load_mini_app_html() -> str:
+    """Load the Mini App page from disk.
+
+    The file has been renamed a few times (``mini_app.html`` -> ``index.html``),
+    so accept any known name and fail loudly if none is present instead of
+    crashing on import.
+    """
+    for name in ("index.html", "mini_app.html"):
+        candidate = Path(__file__).with_name(name)
+        if candidate.exists():
+            return candidate.read_text(encoding="utf-8")
+    raise FileNotFoundError(
+        "Mini App HTML not found next to api.py (expected index.html or mini_app.html)"
+    )
+
+
+MINI_APP_HTML = _load_mini_app_html()
 
 
 # --------------------------------------------------------------------------
