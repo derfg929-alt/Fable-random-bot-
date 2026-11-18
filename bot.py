@@ -1273,6 +1273,39 @@ def build_dispatcher() -> Dispatcher:
     return dp
 
 
+USER_COMMANDS = [
+    ("start", "Запустить бота"),
+    ("contests", "Список конкурсов"),
+    ("join", "Участвовать в конкурсе"),
+    ("myref", "Моя реферальная ссылка"),
+    ("profile", "Мой профиль"),
+    ("history", "История участия"),
+    ("winners", "Победители"),
+    ("help", "Помощь"),
+]
+
+
+async def setup_bot_menu(bot: Bot) -> None:
+    """Publish the command list and the Mini App menu button to Telegram.
+
+    Best-effort: a Telegram outage must not stop startup, so errors are logged
+    and swallowed. When ``WEBAPP_URL`` is set the chat menu button opens the
+    Mini App, otherwise the regular command list is shown.
+    """
+    from aiogram.types import BotCommand, MenuButtonCommands, MenuButtonWebApp, WebAppInfo
+
+    try:
+        await bot.set_my_commands([BotCommand(command=c, description=d) for c, d in USER_COMMANDS])
+        if settings.WEBAPP_URL.startswith("https://"):
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(text="Fable", web_app=WebAppInfo(url=settings.WEBAPP_URL))
+            )
+        else:
+            await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    except Exception as exc:  # noqa: BLE001 - never block startup
+        print(f"[bot] не удалось настроить меню: {exc}")
+
+
 async def send_safe(bot: Bot, chat_id: int, text: str, **kwargs) -> bool:
     """Send a message, swallowing blocked-bot / network errors."""
     try:
