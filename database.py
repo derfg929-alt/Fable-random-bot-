@@ -4,6 +4,8 @@ import os
 
 DB_PATH = "/app/data/database.json"
 
+CONTEST_TYPES = {"simple", "raffle", "draw", "skill", "referral"}
+
 _users_lock = asyncio.Lock()
 _contests_lock = asyncio.Lock()
 
@@ -69,6 +71,10 @@ async def update_contest(contest_id: int, **kwargs):
         contests = data.setdefault("contests", {})
         contest_id_str = str(contest_id)
         if contest_id_str in contests:
+            if "contest_type" in kwargs:
+                if kwargs["contest_type"] not in CONTEST_TYPES:
+                    raise ValueError(f"Invalid contest_type: {kwargs['contest_type']}")
+                contests[contest_id_str]["contest_type"] = kwargs.pop("contest_type")
             contests[contest_id_str].update(kwargs)
             data["contests"] = contests
             await save_data(data)

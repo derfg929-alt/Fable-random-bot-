@@ -14,6 +14,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+CONTEST_TYPES = {"simple", "raffle", "draw", "skill", "referral"}
+
 import settings
 from database import (
     Channel,
@@ -165,17 +167,21 @@ async def create_contest(
     prize: str = "",
     image_url: Optional[str] = None,
     winners_count: int = 1,
+    contest_type: str = "simple",
     created_by: Optional[int] = None,
     start_at: Optional[datetime] = None,
     end_at: Optional[datetime] = None,
     channel_ids: Iterable[int] = (),
 ) -> Contest:
+    if contest_type not in CONTEST_TYPES:
+        raise ValueError(f"Invalid contest_type: {contest_type}. Must be one of {CONTEST_TYPES}")
     contest = Contest(
         title=title.strip(),
         description=description.strip(),
         prize=prize.strip(),
         image_url=image_url,
         winners_count=max(1, int(winners_count)),
+        contest_type=contest_type,
         created_by=created_by,
         start_at=start_at,
         end_at=end_at,
