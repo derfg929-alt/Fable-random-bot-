@@ -5,6 +5,7 @@ from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.utils.default import DefaultBotProperties
 
 from config import BOT_TOKEN
 
@@ -18,7 +19,7 @@ ROUTERS = [start.router, admin.router, user.router, draw.router]
 
 
 async def main() -> None:
-    bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
+    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
