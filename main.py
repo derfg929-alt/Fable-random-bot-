@@ -5,7 +5,7 @@ from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.utils.default import DefaultBotProperties
+from aiogram.client.default import DefaultBotProperties
 
 from config import BOT_TOKEN
 
