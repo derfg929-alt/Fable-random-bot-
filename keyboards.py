@@ -13,7 +13,7 @@ def main_menu(user_id: int, is_admin: bool = False):
     if is_admin:
         buttons.append(KeyboardButton(text="👑 Создать конкурс"))
     builder.row(*buttons, width=len(buttons))
-    return builder.as_keyboard(resize_keyboard=True)
+    return builder.as_markup(resize_keyboard=True)
 
 
 def join_kb(contest_id: int):
