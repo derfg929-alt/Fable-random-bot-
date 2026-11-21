@@ -6,7 +6,6 @@ from config import ADMIN_IDS
 from keyboards import main_menu
 from database import update_user
 
-
 router = Router()
 
 

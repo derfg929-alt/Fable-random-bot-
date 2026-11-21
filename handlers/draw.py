@@ -17,6 +17,7 @@ async def draw_winner(contest_id, bot: Bot):
     contest = await get_contest(contest_id)
     if not contest or contest.get("status") != "active":
         return
+
     participants = contest.get("participants", []) or []
     data = await load_data()
     pool = []
@@ -26,9 +27,11 @@ async def draw_winner(contest_id, bot: Bot):
         if user_tickets < 1:
             user_tickets = 1
         pool.extend([int(uid)] * user_tickets)
+
     if not pool:
         await update_contest(contest_id, status="finished")
         return
+
     winner_id = secrets.choice(pool)
     await update_contest(contest_id, winner=winner_id, status="finished")
     channel = contest.get("channel")
