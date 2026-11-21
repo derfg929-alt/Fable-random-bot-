@@ -63,14 +63,18 @@ async def process_winners_count(message: Message, state: FSMContext):
 @router.callback_query(ContestCreate.settings, F.data == "finish_contest")
 async def finish_contest_callback(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    from database import load_data, save_data
+    from database import save_data
+    
+    # Create contest using the service layer
+    # Note: In a real implementation, we'd have the channel object from the FSM flow
+    # For now, we'll use the simple approach with the JSON database
     data["status"] = "active"
     db = await load_data()
     contest_id = str(len(db["contests"]) + 1)
     db["contests"][contest_id] = data
     await save_data(db)
 
-    await bot.send_message(
+    await callback.bot.send_message(
         chat_id=data["channel"],
         text=f"🎉 Новый конкурс: {data['title']}\nПриз: {data['prize']}\n🏆 Победителей: {data['winners_count']}",
         reply_markup=join_kb(contest_id)
