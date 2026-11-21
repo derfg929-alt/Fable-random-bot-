@@ -2,85 +2,89 @@ import asyncio
 import json
 import os
 
-from config import DB_PATH
+DB_PATH = "/app/data/database.json"
 
-_lock = asyncio.Lock()
+_users_lock = asyncio.Lock()
+_contests_lock = asyncio.Lock()
 
-DEFAULT_DATA = {"users": {}, "contests": {}, "admin_state": {}}
 
-
-def _load_unlocked():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+async def load_data():
+    """Load data from JSON database file."""
     if not os.path.exists(DB_PATH):
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         with open(DB_PATH, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_DATA, f, ensure_ascii=False, indent=2)
-        return {k: (v.copy() if isinstance(v, dict) else v) for k, v in DEFAULT_DATA.items()}
+            json.dump({"users": {}, "contests": {}, "admin_state": {}}, f, ensure_ascii=False, indent=2)
     with open(DB_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _save_unlocked(data):
+async def save_data(data):
+    """Atomically save data to JSON database file using .tmp and os.replace."""
     tmp_path = DB_PATH + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
     os.replace(tmp_path, DB_PATH)
 
 
-async def load_data():
-    async with _lock:
-        return _load_unlocked()
+async def get_user(user_id: int):
+    """Get user data, ensuring captcha_passed and captcha_answer fields exist."""
+    async with _users_lock:
+        data = await load_data()
+        users = data.setdefault("users", {})
+        user_id_str = str(user_id)
+        if user_id_str not in users:
+            users[user_id_str] = {"captcha_passed": False, "captcha_answer": None}
+        data["users"] = users
+        await save_data(data)
+        return users[user_id_str]
 
 
-async def save_data(data):
-    async with _lock:
-        _save_unlocked(data)
+async def update_user(user_id: int, **kwargs):
+    """Update user data fields."""
+    async with _users_lock:
+        data = await load_data()
+        users = data.setdefault("users", {})
+        user_id_str = str(user_id)
+        if user_id_str in users:
+            users[user_id_str].update(kwargs)
+            data["users"] = users
+            await save_data(data)
 
 
-async def get_user(user_id):
-    async with _lock:
-        data = _load_unlocked()
-        return data["users"].get(str(user_id))
+async def get_contest(contest_id: int):
+    """Get contest data by ID."""
+    async with _contests_lock:
+        data = await load_data()
+        contests = data.setdefault("contests", {})
+        contest_id_str = str(contest_id)
+        if contest_id_str in contests:
+            return contests[contest_id_str]
+        return None
 
 
-async def update_user(user_id, **kwargs):
-    async with _lock:
-        data = _load_unlocked()
-        uid = str(user_id)
-        user = data["users"].setdefault(uid, {})
-        user.update(kwargs)
-        _save_unlocked(data)
-        return user
+async def update_contest(contest_id: int, **kwargs):
+    """Update contest data fields."""
+    async with _contests_lock:
+        data = await load_data()
+        contests = data.setdefault("contests", {})
+        contest_id_str = str(contest_id)
+        if contest_id_str in contests:
+            contests[contest_id_str].update(kwargs)
+            data["contests"] = contests
+            await save_data(data)
 
 
-async def get_contest(contest_id):
-    async with _lock:
-        data = _load_unlocked()
-        return data["contests"].get(str(contest_id))
-
-
-async def update_contest(contest_id, **kwargs):
-    async with _lock:
-        data = _load_unlocked()
-        cid = str(contest_id)
-        contest = data["contests"].setdefault(cid, {})
-        contest.update(kwargs)
-        _save_unlocked(data)
-        return contest
-
-
-async def add_participant(contest_id, user_id):
-    async with _lock:
-        data = _load_unlocked()
-        cid = str(contest_id)
-        uid = str(user_id)
-        contest = data["contests"].get(cid)
-        if contest is None:
+async def add_participant(contest_id: int, user_id: int):
+    """Add a participant to a contest."""
+    async with _contests_lock:
+        data = await load_data()
+        contests = data.setdefault("contests", {})
+        contest_id_str = str(contest_id)
+        if contest_id_str not in contests:
             return False
-        participants = contest.setdefault("participants", [])
-        if uid in participants:
-            return False
-        participants.append(uid)
-        _save_unlocked(data)
-        return True
+        if user_id_str := str(user_id) not in contests[contest_id_str].get("participants", []):
+            contests[contest_id_str].setdefault("participants", []).append(user_id_str)
+            data["contests"] = contests
+            await save_data(data)
+            return True
+        return False
