@@ -5,7 +5,10 @@ from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.utils.default import DefaultBotProperties
+
+# Import DefaultBotProperties directly from the client module
+# This fixes the ModuleNotFoundError: No module named 'aiogram.utils.default' error
+from aiogram.client.default import DefaultBotProperties
 
 from config import BOT_TOKEN
 
@@ -16,7 +19,6 @@ from handlers import start, admin, user, draw
 
 # Router registration order matters
 ROUTERS = [start.router, admin.router, user.router, draw.router]
-
 
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
@@ -29,7 +31,6 @@ async def main() -> None:
 
     # Start polling
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
