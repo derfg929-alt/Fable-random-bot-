@@ -138,6 +138,13 @@ async def publish_contest(
     outcome.channels = len(channels)
     text = contest_announcement(contest)
     link = _contest_link(contest.id)
+    markup = None
+    if link:
+        from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+        markup = InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="🎉 Участвовать", url=link)]]
+        )
     for channel in channels:
         try:
             await bot.send_message(
@@ -145,12 +152,8 @@ async def publish_contest(
                 text,
                 parse_mode="HTML",
                 disable_web_page_preview=False,
+                reply_markup=markup,
             )
-            if link:
-                await bot.send_message(
-                    channel.chat_id,
-                    f"👉 Участвовать: {link}",
-                )
             outcome.sent += 1
         except Exception as exc:  # noqa: BLE001 - report per channel, keep going
             outcome.failed.append(f"{channel.title}: {str(exc)[:120]}")

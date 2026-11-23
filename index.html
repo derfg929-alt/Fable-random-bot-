@@ -124,8 +124,12 @@ window.go = function(page, param){
 
 function loading(){ app.innerHTML = '<div class="spinner"></div><div class="loading">Загрузка...</div>'; }
 function errorBox(e){
-  const msg = e && e.status===401 ? 'Открой Mini App из Telegram, чтобы войти.'
-            : e && e.status===403 ? 'Нет доступа.' : 'Что-то пошло не так. Попробуй позже.';
+  const detail = e && e.data && e.data.detail;
+  let msg = 'Что-то пошло не так. Попробуй позже.';
+  if (e && e.status===401) msg = 'Открой Mini App из Telegram, чтобы войти.';
+  else if (detail==='not_registered') msg = 'Сначала нажми /start в боте, чтобы зарегистрироваться.';
+  else if (detail==='blocked') msg = 'Доступ ограничен администратором.';
+  else if (e && e.status===403) msg = 'Нет доступа.';
   app.innerHTML = `<div class="err">${esc(msg)}</div><button class="ghost" onclick="go('home')">На главную</button>`;
 }
 
@@ -281,8 +285,18 @@ async function renderReferral(){
     else toast('Скопируй ссылку вручную');
   };
   document.getElementById('copy').onclick = async ()=>{
-    try{ await navigator.clipboard.writeText(link); toast('Ссылка скопирована'); }
-    catch(e){ toast('Не удалось скопировать'); }
+    const done = ()=>{ toast('Ссылка скопирована'); };
+    try{
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(link); done(); return;
+      }
+    }catch(e){ /* fall through to the legacy path */ }
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = link; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove(); done();
+    }catch(e){ toast('Не удалось скопировать'); }
   };
 }
 
@@ -347,7 +361,11 @@ async function renderAdmin(){
 }
 
 window.adminContests = async function(){
-  const rows = await api('/api/admin/contests');
+  const [rows, channels] = await Promise.all([
+    api('/api/admin/contests'),
+    api('/api/admin/channels').catch(()=>[])
+  ]);
+  const activeChannels = (channels||[]).filter(c=>c.is_active);
   document.getElementById('adminBody').innerHTML = `
     <div class="head"><button class="back" onclick="renderAdmin()">←</button><h1>Конкурсы</h1></div>
     ${rows.length?rows.map(c=>`
@@ -370,18 +388,32 @@ window.adminContests = async function(){
       <label>Приз</label><input id="cPrize">
       <label>Изображение (URL)</label><input id="cImg">
       <label>Победителей</label><input id="cWinners" type="number" value="1" min="1">
+      <label>Начало (необязательно)</label><input id="cStart" type="datetime-local">
+      <label>Окончание (необязательно)</label><input id="cEnd" type="datetime-local">
+      <label>Обязательные каналы</label>
+      ${activeChannels.length
+        ? activeChannels.map(c=>`<label class="row" style="margin:6px 0"><input type="checkbox" data-channel="${c.id}" style="width:auto;margin-right:8px"> ${esc(c.title)}</label>`).join('')
+        : '<div class="sub">Каналов нет. Добавь их командой /addchannel в боте.</div>'}
       <button style="margin-top:12px" onclick="adminCreate()">Создать</button>
     </div>`;
 };
 
 window.adminCreate = async function(){
   try{
+    const start = document.getElementById('cStart').value;
+    const end = document.getElementById('cEnd').value;
+    const dateRe = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+    if((start && !dateRe.test(start)) || (end && !dateRe.test(end))){ toast('Неверный формат даты'); return; }
     const body = {
       title: document.getElementById('cTitle').value,
       description: document.getElementById('cDesc').value,
       prize: document.getElementById('cPrize').value,
       image_url: document.getElementById('cImg').value || null,
       winners_count: parseInt(document.getElementById('cWinners').value||'1',10),
+      start_at: start || null,
+      end_at: end || null,
+      channel_ids: Array.from(document.querySelectorAll('#adminBody input[data-channel]:checked'))
+        .map(i=>parseInt(i.dataset.channel,10)),
     };
     if(!body.title){ toast('Укажи название'); return; }
     const r = await api('/api/admin/contests',{method:'POST',body:JSON.stringify(body)});
@@ -532,7 +564,7 @@ window.adminAudit = async function(){
     <div class="head"><button class="back" onclick="renderAdmin()">←</button><h1>Журнал</h1></div>
     ${rows.length?`<div class="card">${rows.map(l=>`<div class="list-item">
       <div><b>${esc(l.action)}</b><div class="sub">${esc(l.target||'')}</div></div>
-      <span class="sub">${fmtDate(l.created_at)}</div>`).join('')}</div>`
+      <span class="sub">${fmtDate(l.created_at)}</span></div>`).join('')}</div>`
       :'<div class="card muted">Журнал пуст.</div>'}`;
 };
 
