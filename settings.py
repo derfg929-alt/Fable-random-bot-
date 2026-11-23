@@ -69,9 +69,21 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "").strip().lstrip("@")
 OWNER_IDS = _get_ids("OWNER_IDS") or _get_ids("ADMIN_IDS")
 
 # --- Web / Mini App ---------------------------------------------------------
-WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()
+# Public HTTPS URL where the Mini App is served. Hosting platforms usually
+# expose it as PUBLIC_URL / RENDER_EXTERNAL_URL, so those are used as fallbacks.
+WEBAPP_URL = (
+    os.getenv("WEBAPP_URL")
+    or os.getenv("MINI_APP_URL")
+    or os.getenv("PUBLIC_URL")
+    or os.getenv("RENDER_EXTERNAL_URL")
+    or ""
+).strip()
+if WEBAPP_URL and not WEBAPP_URL.startswith(("http://", "https://")):
+    WEBAPP_URL = f"https://{WEBAPP_URL}"
+WEBAPP_URL = WEBAPP_URL.rstrip("/")
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = _get_int("PORT", 8000)
+# ``PORT`` is what Heroku/Railway/Render/Amvera inject; API_PORT is a fallback.
+PORT = _get_int("PORT", _get_int("API_PORT", 8000))
 # How long a Telegram Mini App initData signature stays valid (seconds).
 INIT_DATA_MAX_AGE = _get_int("INIT_DATA_MAX_AGE", 86400)
 

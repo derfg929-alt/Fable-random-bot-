@@ -102,3 +102,36 @@ async def test_run_bot_retries_instead_of_crashing(monkeypatch):
 
     await asyncio.gather(main_module.run_bot(bot, stop_event), _stop_soon())
     assert bot.attempts >= 1
+
+
+async def test_run_bot_stops_polling_when_stop_event_is_set(monkeypatch):
+    """SIGTERM only sets ``stop_event``; polling must be stopped explicitly."""
+    import asyncio
+
+    import main as main_module
+
+    class FakeBot:
+        async def delete_webhook(self, **kwargs):
+            return True
+
+    class BlockingDispatcher:
+        def __init__(self):
+            self._running_lock = asyncio.Lock()
+            self.stopped = asyncio.Event()
+
+        async def start_polling(self, *args, **kwargs):
+            async with self._running_lock:
+                await self.stopped.wait()
+
+        async def stop_polling(self):
+            self.stopped.set()
+
+    dispatcher = BlockingDispatcher()
+    monkeypatch.setattr(main_module, "build_dispatcher", lambda: dispatcher)
+
+    stop_event = asyncio.Event()
+    task = asyncio.create_task(main_module.run_bot(FakeBot(), stop_event))
+    await asyncio.sleep(0.05)
+    stop_event.set()
+    await asyncio.wait_for(task, timeout=1)
+    assert dispatcher.stopped.is_set()

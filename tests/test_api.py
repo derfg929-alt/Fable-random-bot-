@@ -221,3 +221,23 @@ async def test_admin_can_update_contest(client):
     detail = await client.get(f"/api/contests/{contest_id}", headers=headers)
     assert detail.json()["title"] == "Обновлённый"
     assert detail.json()["winners_count"] == 3
+
+
+async def test_admin_can_create_contest_for_several_channels(client):
+    async with session_scope() as session:
+        ch1 = await make_channel(session, -1001, "News")
+        ch2 = await make_channel(session, -1002, "Chat")
+        channel_ids = [ch1.id, ch2.id]
+    await _seed(1000, owner_id=1000)
+    headers = {"X-Telegram-Init-Data": _init_data(1000)}
+
+    r = await client.post(
+        "/api/admin/contests",
+        headers=headers,
+        json={"title": "Multi-channel", "channel_ids": channel_ids},
+    )
+    assert r.status_code == 200
+    contest_id = r.json()["id"]
+
+    detail = await client.get(f"/api/contests/{contest_id}", headers=headers)
+    assert [c["title"] for c in detail.json()["channels"]] == ["News", "Chat"]

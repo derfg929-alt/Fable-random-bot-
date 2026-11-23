@@ -112,3 +112,29 @@ async def test_delete_channel_keeps_contest(session):
     # contest survives, but the channel is no longer a required one
     required = await contest_service.contest_channels(session, contest.id)
     assert required == []
+
+
+async def test_publish_contest_sends_join_button_to_every_channel(session):
+    class RecordingBot:
+        def __init__(self):
+            self.calls = []
+
+        async def send_message(self, chat_id, text, **kwargs):
+            self.calls.append((chat_id, text, kwargs))
+
+    ch1 = await make_channel(session, -1001, "News")
+    ch2 = await make_channel(session, -1002, "Chat")
+    await make_user(session, 1, "Alice")
+    contest = await make_contest(session, channels=[ch1, ch2])
+    bot = RecordingBot()
+
+    outcome = await services.publish_contest(session, bot, contest=contest)
+
+    assert outcome.sent == 2
+    for chat_id in (ch1.chat_id, ch2.chat_id):
+        channel_calls = [c for c in bot.calls if c[0] == chat_id]
+        assert len(channel_calls) == 1
+        markup = channel_calls[0][2]["reply_markup"]
+        assert markup.inline_keyboard[0][0].url.endswith(f"start=contest_{contest.id}")
+    assert contest.published_at is not None
+    assert contest.status == ContestStatus.ACTIVE.value
