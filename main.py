@@ -63,8 +63,24 @@ async def run_bot(bot: Bot, stop_event: asyncio.Event) -> None:
         try:
             await bot.delete_webhook(drop_pending_updates=False)
             dispatcher = build_dispatcher()
+
+            async def _stop_when_asked() -> None:
+                await stop_event.wait()
+                # aiogram only stops polling itself on signals it installed;
+                # with handle_signals=False we must drive it explicitly.
+                lock = getattr(dispatcher, "_running_lock", None)
+                if lock is not None and lock.locked():
+                    try:
+                        await dispatcher.stop_polling()
+                    except Exception:  # noqa: BLE001 - already stopping
+                        pass
+
+            watcher = asyncio.create_task(_stop_when_asked())
             logger.info("Bot polling started")
-            await dispatcher.start_polling(bot, handle_signals=False)
+            try:
+                await dispatcher.start_polling(bot, handle_signals=False)
+            finally:
+                watcher.cancel()
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 - must not kill the process
@@ -149,11 +165,15 @@ async def main() -> None:
     _install_signal_handlers(stop_event)
     logger.info("Fable Randomizer started")
     try:
-        await asyncio.gather(
+        results = await asyncio.gather(
             run_bot(bot, stop_event),
             run_api(stop_event),
             tasks.worker(bot, stop_event),
+            return_exceptions=True,
         )
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error("A background task stopped unexpectedly: %s", result)
     finally:
         await bot.session.close()
         logger.info("Fable Randomizer stopped")

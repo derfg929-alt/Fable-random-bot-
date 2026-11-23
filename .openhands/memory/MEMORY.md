@@ -15,7 +15,9 @@ Index of durable, non-obvious facts learned while working in this repo.
   `ping()`. SQLite `:memory:` uses `StaticPool` + `check_same_thread=False` so tests
   and API share one connection.
 - Rewrote `main.py`: `run_bot` (delete_webhook + `start_polling(handle_signals=False)`,
-  retry `POLLING_RETRY_SECONDS=15`), `run_api` (uvicorn, `capture_signals=nullcontext`,
+  retry `POLLING_RETRY_SECONDS=15`, watcher calls `dp.stop_polling()` when
+  `stop_event` is set — required because with `handle_signals=False` aiogram never
+  stops by itself), `run_api` (uvicorn, `capture_signals=nullcontext`,
   `should_exit` watcher, retry), `tasks.worker`, own SIGINT/SIGTERM → `stop_event`,
   `build_dispatcher`/`setup_bot_menu` from `bot.py`, auto-detect `BOT_USERNAME` via getMe,
   `python main.py --check` (fatal only token/DB). Verified: Mini App serves with a fake
@@ -30,7 +32,7 @@ Index of durable, non-obvious facts learned while working in this repo.
   «🎉 Участвовать» URL button (previously a second plain-link message).
 - Mini App: admin create form now supports dates + required-channel checkboxes
   (`channel_ids`), 403 `not_registered` hint, clipboard fallback, audit markup fix.
-- Tests: **90 passed**; `python -m pyflakes *.py tests/*.py` clean.
+- Tests: **91 passed**; `python -m pyflakes *.py tests/*.py` clean.
 
 
 ## ⚠️ THIS repo = flat-layout "Fable Randomizer" (contest bot + Mini App)
